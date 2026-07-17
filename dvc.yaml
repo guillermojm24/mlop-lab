@@ -1,0 +1,24 @@
+stages:
+  preparar:
+    cmd: python datos.py
+    deps:
+    - datos.py
+    params:
+    - datos.n
+    - datos.seed
+    outs:
+    - empleados.csv
+  entrenar:
+    cmd: python entrenar.py
+    deps:
+    - entrenar.py
+    - empleados.csv
+    params:
+    - entrenar.n_estimators
+    - entrenar.test_size
+    - entrenar.random_state
+    outs:
+    - modelo.pkl
+    metrics:
+    - metrics.json:
+        cache: false

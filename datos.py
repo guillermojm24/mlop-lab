@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
+import yaml
 
-np.random.seed(42)  # reproducibilidad: mismos datos siempre
-n = 1000
+p = yaml.safe_load(open("params.yaml"))["datos"]
+np.random.seed(p["seed"])  # reproducibilidad: mismos datos siempre
+n = p["n"]
 
 df = pd.DataFrame({
     "antiguedad_anios": np.random.randint(0, 15, n),
