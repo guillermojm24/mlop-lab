@@ -25,19 +25,19 @@ stages:
       size: 15039
     - path: entrenar.py
       hash: md5
-      md5: 0bd8772e0db9aa75e362660f1fb1fe79
-      size: 903
+      md5: 4c6a76fe8931e4d0c14da4ed906eae0f
+      size: 1100
     params:
       params.yaml:
-        entrenar.n_estimators: 100
+        entrenar.n_estimators: 50
         entrenar.random_state: 42
         entrenar.test_size: 0.2
     outs:
     - path: metrics.json
       hash: md5
-      md5: be8f69f7ba7d8f52f1108c60fd89251a
-      size: 18
+      md5: c696e39045a442023288a8cf0a106f38
+      size: 54
     - path: modelo.pkl
       hash: md5
-      md5: 619a3a6a5ba7997e2d984e578b68b609
-      size: 1479225
+      md5: 208df1aefc428705cd8794681b1f8ecc
+      size: 744025
