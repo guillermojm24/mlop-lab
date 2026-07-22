@@ -1,0 +1,10 @@
+.git
+.venv
+__pycache__
+data
+metrics
+models/modelo.pkl
+models/modelo_servido
+tests
+*.tar
+*.pyc

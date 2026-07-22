@@ -1,43 +1,71 @@
 schema: '2.0'
 stages:
   preparar:
-    cmd: python datos.py
+    cmd: PYTHONPATH=src python -m prediccion_fuga.data
     deps:
-    - path: datos.py
+    - path: params.yaml
       hash: md5
-      md5: 45d8656b17f8fec2ecc481b8ac1dcfc8
-      size: 723
+      md5: 015e4ab552aecca082ec315ab133ec62
+      size: 94
+    - path: src/prediccion_fuga/config.py
+      hash: md5
+      md5: 1c04dfc121e567ae99be1711e6160fa9
+      size: 374
+    - path: src/prediccion_fuga/data.py
+      hash: md5
+      md5: fada49fbe569efeea77fdd3638a96be6
+      size: 1821
+    - path: src/prediccion_fuga/paths.py
+      hash: md5
+      md5: 23004b4cbfcf35161963a1c30bd614d1
+      size: 610
     params:
       params.yaml:
         datos.n: 1000
         datos.seed: 42
     outs:
-    - path: empleados.csv
+    - path: data/empleados.csv
       hash: md5
-      md5: 8228f876a302a7ffc2ee88b77d07764e
-      size: 15039
+      md5: a10dddc3cb18eda1a1b3a7355be52c73
+      size: 15053
   entrenar:
-    cmd: python entrenar.py
+    cmd: PYTHONPATH=src python -m prediccion_fuga.train
     deps:
-    - path: empleados.csv
+    - path: data/empleados.csv
       hash: md5
-      md5: 8228f876a302a7ffc2ee88b77d07764e
-      size: 15039
-    - path: entrenar.py
+      md5: a10dddc3cb18eda1a1b3a7355be52c73
+      size: 15053
+    - path: params.yaml
       hash: md5
-      md5: 4c6a76fe8931e4d0c14da4ed906eae0f
-      size: 1100
+      md5: 015e4ab552aecca082ec315ab133ec62
+      size: 94
+    - path: src/prediccion_fuga/config.py
+      hash: md5
+      md5: 1c04dfc121e567ae99be1711e6160fa9
+      size: 374
+    - path: src/prediccion_fuga/data.py
+      hash: md5
+      md5: fada49fbe569efeea77fdd3638a96be6
+      size: 1821
+    - path: src/prediccion_fuga/paths.py
+      hash: md5
+      md5: 23004b4cbfcf35161963a1c30bd614d1
+      size: 610
+    - path: src/prediccion_fuga/train.py
+      hash: md5
+      md5: 8d042f533352aedc1089dfc71f8d5553
+      size: 1727
     params:
       params.yaml:
         entrenar.n_estimators: 50
         entrenar.random_state: 42
         entrenar.test_size: 0.2
     outs:
-    - path: metrics.json
+    - path: metrics/metrics.json
       hash: md5
-      md5: c696e39045a442023288a8cf0a106f38
-      size: 54
-    - path: modelo.pkl
+      md5: 62110e68a494310366a07479a207953e
+      size: 62
+    - path: models/modelo.pkl
       hash: md5
-      md5: 208df1aefc428705cd8794681b1f8ecc
-      size: 744025
+      md5: 1107defcf06c077511fa0462f0712f2a
+      size: 856985

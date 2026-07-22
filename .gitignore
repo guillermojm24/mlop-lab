@@ -1,2 +1,29 @@
+# Entorno local y cachés
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Artefactos generados por el pipeline
+/data/empleados.csv
+/models/modelo.pkl
+/models/modelo_servido/
+
+# Compatibilidad con la estructura anterior
 /empleados.csv
 /modelo.pkl
+/modelo_servido/
+
+# Artefactos locales de MLflow/Docker
+/mlruns/
+/modelo.tar
+/docker-compose.override.yml
+
+# Configuración DVC específica de cada máquina
+/.dvc/config.local
+
+# Secretos y configuración local
+.env
+.env.*
+!.env.example

@@ -1,24 +1,31 @@
 stages:
   preparar:
-    cmd: python datos.py
+    cmd: PYTHONPATH=src python -m prediccion_fuga.data
     deps:
-    - datos.py
+    - src/prediccion_fuga/data.py
+    - src/prediccion_fuga/paths.py
+    - src/prediccion_fuga/config.py
+    - params.yaml
     params:
     - datos.n
     - datos.seed
     outs:
-    - empleados.csv
+    - data/empleados.csv
   entrenar:
-    cmd: python entrenar.py
+    cmd: PYTHONPATH=src python -m prediccion_fuga.train
     deps:
-    - entrenar.py
-    - empleados.csv
+    - src/prediccion_fuga/train.py
+    - src/prediccion_fuga/data.py
+    - src/prediccion_fuga/paths.py
+    - src/prediccion_fuga/config.py
+    - data/empleados.csv
+    - params.yaml
     params:
     - entrenar.n_estimators
     - entrenar.test_size
     - entrenar.random_state
     outs:
-    - modelo.pkl
+    - models/modelo.pkl
     metrics:
-    - metrics.json:
+    - metrics/metrics.json:
         cache: false
