@@ -1,4 +1,4 @@
-"""Lanza un entrenamiento y registra parámetros, métricas y modelo en MLflow."""
+"""Train a model and log parameters, metrics and artifacts to MLflow."""
 
 from __future__ import annotations
 
@@ -16,7 +16,8 @@ from prediccion_fuga.data import FEATURES
 from prediccion_fuga.paths import DATA_PATH
 
 
-def main() -> None:
+def train_with_mlflow() -> str:
+    """Run one tracked training job and return its MLflow run ID."""
     params = load_params()["entrenar"]
     n_estimators = int(os.getenv("N_ESTIMATORS", params["n_estimators"]))
     dataframe = pd.read_csv(DATA_PATH)
@@ -29,21 +30,28 @@ def main() -> None:
     )
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000"))
-    mlflow.set_experiment(os.getenv("MLFLOW_EXPERIMENT_NAME", "prediccion-fuga"))
-    with mlflow.start_run():
+    mlflow.set_experiment(os.getenv("MLFLOW_EXPERIMENT_NAME", "employee-attrition"))
+
+    with mlflow.start_run() as run:
+        model = RandomForestClassifier(n_estimators=n_estimators, random_state=params["random_state"])
+        model.fit(X_train, y_train)
+        scores = cross_val_score(model, X_train, y_train, cv=5)
+
         mlflow.log_params({**params, "n_estimators": n_estimators})
-        modelo = RandomForestClassifier(n_estimators=n_estimators, random_state=params["random_state"])
-        modelo.fit(X_train, y_train)
-        scores = cross_val_score(modelo, X_train, y_train, cv=5)
         mlflow.log_metrics(
             {
-                "accuracy": accuracy_score(y_test, modelo.predict(X_test)),
-                "cv_mean": scores.mean(),
-                "cv_std": scores.std(),
+                "accuracy": float(accuracy_score(y_test, model.predict(X_test))),
+                "cv_mean": float(scores.mean()),
+                "cv_std": float(scores.std()),
             }
         )
-        mlflow.sklearn.log_model(modelo, name="modelo")
-        print(f"Run registrado: {mlflow.active_run().info.run_id}")
+        mlflow.sklearn.log_model(model, name="model")
+        return run.info.run_id
+
+
+def main() -> None:
+    run_id = train_with_mlflow()
+    print(f"MLflow run registered: {run_id}")
 
 
 if __name__ == "__main__":
