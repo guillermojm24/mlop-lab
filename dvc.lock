@@ -5,8 +5,8 @@ stages:
     deps:
     - path: params.yaml
       hash: md5
-      md5: 015e4ab552aecca082ec315ab133ec62
-      size: 94
+      md5: 8eaf7ac8b4dd9e470329b607d040ddaa
+      size: 173
     - path: src/prediccion_fuga/config.py
       hash: md5
       md5: 1c04dfc121e567ae99be1711e6160fa9
@@ -37,8 +37,8 @@ stages:
       size: 15053
     - path: params.yaml
       hash: md5
-      md5: 015e4ab552aecca082ec315ab133ec62
-      size: 94
+      md5: 8eaf7ac8b4dd9e470329b607d040ddaa
+      size: 173
     - path: src/prediccion_fuga/config.py
       hash: md5
       md5: 1c04dfc121e567ae99be1711e6160fa9
@@ -57,15 +57,15 @@ stages:
       size: 1727
     params:
       params.yaml:
-        entrenar.n_estimators: 50
+        entrenar.n_estimators: 2000
         entrenar.random_state: 42
         entrenar.test_size: 0.2
     outs:
     - path: metrics/metrics.json
       hash: md5
-      md5: 62110e68a494310366a07479a207953e
+      md5: 915aade1dafd4aacae4e13585423df1a
       size: 62
     - path: models/modelo.pkl
       hash: md5
-      md5: 1107defcf06c077511fa0462f0712f2a
-      size: 856985
+      md5: c8281edebca08819c9b0de029f0ff9bd
+      size: 34577961

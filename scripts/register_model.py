@@ -32,4 +32,3 @@ with open("metrics/metrics.json", "r") as file:
             alias="champion",
             version=registered_model.version
 )
-
