@@ -6,3 +6,9 @@ entrenar:
   n_estimators: 2000
   test_size: 0.2
   random_state: 42
+
+evaluar:
+  min_accuracy: 0.85
+
+promocionar:
+  min_challenger_accuracy: 0.80

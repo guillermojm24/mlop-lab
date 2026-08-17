@@ -1,6 +1,7 @@
 # Entorno local y cachés
 .venv/
 __pycache__/
+*.egg-info/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
