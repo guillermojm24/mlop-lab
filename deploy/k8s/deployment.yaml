@@ -1,20 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: prediccion-fuga
+  name: employee-attrition-api
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: prediccion-fuga
+      app: employee-attrition-api
   template:
     metadata:
       labels:
-        app: prediccion-fuga
+        app: employee-attrition-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8000"
     spec:
       containers:
         - name: api
-          image: prediccion-fuga:v1
+          image: employee-attrition-api:v1
           imagePullPolicy: Never
           ports:
             - name: http
@@ -24,11 +28,13 @@ spec:
               path: /health
               port: http
             initialDelaySeconds: 5
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
               port: http
             initialDelaySeconds: 5
+            periodSeconds: 5
           resources:
             requests:
               cpu: 100m
@@ -40,10 +46,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: prediccion-fuga
+  name: employee-attrition-api
 spec:
   selector:
-    app: prediccion-fuga
+    app: employee-attrition-api
   ports:
     - port: 80
       targetPort: http
