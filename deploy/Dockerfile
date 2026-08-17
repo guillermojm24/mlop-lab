@@ -1,11 +1,11 @@
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
 COPY requirements-api.txt .
 RUN pip install --no-cache-dir -r requirements-api.txt
 
-# El modelo se exporta previamente desde MLflow con scripts/export_model.py.
+# The model is exported from MLflow before the image is built.
 COPY models/modelo_servido/ ./models/modelo_servido/
 COPY src/ ./src/
 
