@@ -1,89 +1,296 @@
-# Predicción de fuga de empleados
+# MLOps Lab: Employee Attrition
 
-Proyecto de MLOps reproducible para estimar el riesgo de fuga de empleados a partir de un dataset sintético. El repositorio muestra el ciclo completo: generación de datos, entrenamiento versionado con DVC, tracking con MLflow, demostraciones de drift, API FastAPI y despliegue en Docker/Kubernetes.
+End-to-end MLOps learning project built around a deliberately simple employee attrition classifier. The goal of the repository is not model complexity, but understanding how the different pieces of an ML platform fit together: reproducible training, orchestration, model evaluation, experiment tracking, model registry, champion/challenger comparison, serving and Kubernetes deployment.
 
-> El dataset es sintético y sirve para demostrar prácticas de ingeniería y operación de modelos. No representa decisiones reales de recursos humanos.
+> The dataset is synthetic and exists only to demonstrate ML engineering and MLOps practices. It must not be used for real HR decision-making.
 
-## Arquitectura
+## What this project demonstrates
+
+- Reproducible data generation and model training with **DVC**.
+- Experiment tracking and model lifecycle management with **MLflow**.
+- Workflow orchestration with **Apache Airflow**.
+- Explicit model quality gates before promotion.
+- **Champion/challenger** comparison on a shared evaluation dataset.
+- Automatic promotion of an approved challenger through the MLflow Model Registry `@champion` alias.
+- Model serving through **FastAPI**.
+- Containerization with **Docker** and deployment manifests for **Kubernetes**.
+- Basic drift and monitoring experiments.
+- CI validation through GitHub Actions.
+
+## Architecture
 
 ```text
-                  params.yaml
-                       │
-                       ▼
-              ┌────── DVC ──────┐
-              │                 │
-              ▼                 ▼
-     data/empleados.csv   models/modelo.pkl
-                                  │
-                                  ├── predict / drift / monitor
-                                  │
-                                  ▼
-                         MLflow → champion
-                                  │
-                                  ▼
-                  models/modelo_servido/ → API
-                                  │
-                         Docker / Kubernetes
+                       params.yaml
+                            │
+                            ▼
+                  ┌──────── DVC ────────┐
+                  │                     │
+                  ▼                     ▼
+          generated data         trained model.pkl
+                  │                     │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                        Apache Airflow
+                             │
+          ┌──────────────────┴──────────────────┐
+          │                                     │
+          ▼                                     │
+     prepare_data                                │
+          ↓                                     │
+        train                                    │
+          ↓                                     │
+       evaluate  ── quality gate                 │
+          ↓                                     │
+   compare_models                               │
+      ↙       ↘                                  │
+ champion   challenger                           │
+   MLflow    local model                         │
+      ↘       ↙                                  │
+   shared evaluation.csv                         │
+          ↓                                     │
+   comparison.json                               │
+          ↓                                     │
+   promote_models                                │
+          ↓                                     │
+ MLflow Model Registry                           │
+          ↓                                     │
+      @champion                                  │
+          ↓                                     │
+     export model                                │
+          ↓                                     │
+       FastAPI                                   │
+          ↓                                     │
+ Docker / Kubernetes  ◄──────────────────────────┘
 ```
 
-La lógica reutilizable vive en `src/prediccion_fuga`. Los comandos operativos están en `scripts/`, el manifiesto de imagen en `deploy/` y los tests en `tests/`. Los datos, modelos exportados y stores locales quedan fuera del repositorio.
+## DVC vs Airflow
 
-## Inicio rápido
+Both tools describe workflows, but they solve different problems in this repository.
 
-Requisitos: Python 3.11+ y DVC. En este entorno se puede usar el virtualenv incluido:
+**DVC** focuses on reproducibility and dependency tracking. It knows which code, parameters, datasets and artifacts belong to a training execution and can avoid recomputing unchanged stages.
+
+**Airflow** is the orchestration layer. It defines task ordering, retries, execution state and the operational lifecycle of the full MLOps workflow.
+
+The current Airflow DAG is:
+
+```text
+prepare_data
+     ↓
+   train
+     ↓
+ evaluate
+     ↓
+ compare
+     ↓
+ promote
+```
+
+## Repository structure
+
+```text
+.
+├── airflow/
+│   └── dags/
+│       └── ml_pipeline.py       # End-to-end Airflow DAG
+├── data/
+│   └── evaluation.csv           # Shared dataset for champion/challenger evaluation
+├── deploy/
+│   ├── Dockerfile
+│   └── k8s/
+│       └── deployment.yaml
+├── metrics/
+│   ├── metrics.json             # Training metrics
+│   └── comparison.json          # Champion/challenger metrics
+├── scripts/
+│   ├── evaluate.py              # Minimum model quality gate
+│   ├── compare_models.py        # Evaluate champion and challenger on the same data
+│   ├── promote_models.py        # Register and promote an approved challenger
+│   ├── register_model.py        # Initial MLflow registration helper
+│   ├── train_mlflow.py          # MLflow-tracked training
+│   └── export_model.py          # Export the current champion for serving
+├── src/prediccion_fuga/         # Reusable Python package
+├── dvc.yaml
+├── dvc.lock
+├── params.yaml
+├── requirements.txt
+├── requirements-api.txt
+└── requirements-airflow.txt
+```
+
+## Local setup
+
+Create and activate a virtual environment:
 
 ```bash
-.venv/bin/pip install -r requirements.txt
-.venv/bin/dvc repro
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-El pipeline deja sus resultados en `data/empleados.csv`, `models/modelo.pkl` y `metrics/metrics.json`.
-
-Checks principales:
+Install the core project dependencies and install the local package in editable mode:
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
-PYTHONPATH=src .venv/bin/python -m prediccion_fuga.predict
-PYTHONPATH=src .venv/bin/python -m prediccion_fuga.drift
-PYTHONPATH=src .venv/bin/python -m prediccion_fuga.drift_ciego
-PYTHONPATH=src .venv/bin/python -m prediccion_fuga.monitor
+pip install -r requirements.txt
+pip install -e .
 ```
+
+Install Airflow separately because it is only required by the orchestration environment:
+
+```bash
+pip install -r requirements-airflow.txt
+```
+
+## Reproduce the DVC pipeline
+
+```bash
+dvc repro
+```
+
+The reproducible training pipeline generates the training dataset, the local model artifact and its metrics.
 
 ## MLflow
 
-Con un servidor MLflow local en `http://127.0.0.1:5000`:
+Start a local MLflow tracking server with SQLite as the backend store:
 
 ```bash
-PYTHONPATH=src .venv/bin/python scripts/train_mlflow.py
+mlflow server \
+  --host 127.0.0.1 \
+  --port 5000 \
+  --backend-store-uri sqlite:///mlflow.db
 ```
 
-La URL, el experimento y el número de árboles se pueden cambiar sin editar código mediante `MLFLOW_TRACKING_URI`, `MLFLOW_EXPERIMENT_NAME` y `N_ESTIMATORS`.
+The UI is then available at:
 
-## API y despliegue
+```text
+http://127.0.0.1:5000
+```
 
-Para servir el modelo champion registrado en MLflow, exportarlo primero:
+The repository uses MLflow for experiment tracking, logged models, model versions and the `@champion` alias.
+
+### Initial model registration
+
+After training a model, an initial registered model can be created with:
 
 ```bash
-PYTHONPATH=src .venv/bin/python scripts/export_model.py
+python scripts/register_model.py
+```
+
+This creates or updates the `employee-attrition` registered model and assigns the selected version the `@champion` alias.
+
+## Champion/challenger workflow
+
+A newly trained local model acts as the **challenger**. The current production candidate is loaded from MLflow through:
+
+```text
+models:/employee-attrition@champion
+```
+
+`compare_models.py` evaluates both models against the same `data/evaluation.csv` dataset and calculates:
+
+- accuracy
+- precision
+- recall
+- F1 score
+
+The results are stored in `metrics/comparison.json`.
+
+`promote_models.py` then evaluates the promotion rule. In the current learning implementation, the challenger must:
+
+1. achieve a higher F1 score than the current champion, and
+2. meet the configured minimum accuracy used by the promotion logic.
+
+If both conditions are met, the challenger is logged to MLflow, registered as a new model version and the `@champion` alias is moved to that version. If not, the existing champion remains unchanged.
+
+The thresholds in this repository are educational defaults rather than production business requirements.
+
+## Airflow
+
+The DAG is defined in `airflow/dags/ml_pipeline.py` and currently runs manually (`schedule=None`). Tasks have retries configured and execute from the repository root so that local project paths remain consistent.
+
+Point Airflow at the repository DAG folder:
+
+```bash
+export AIRFLOW__CORE__DAGS_FOLDER="$(pwd)/airflow/dags"
+```
+
+Initialize or migrate the Airflow metadata database:
+
+```bash
+airflow db migrate
+```
+
+Check that the DAG is discovered:
+
+```bash
+airflow dags list --local
+```
+
+Run the complete workflow locally:
+
+```bash
+airflow dags test employee_attrition $(date +%Y-%m-%d)
+```
+
+This executes:
+
+```text
+prepare_data → train → evaluate → compare → promote
+```
+
+A model failing the `evaluate` quality gate stops downstream execution. A challenger that is valid but does not beat the current champion is not considered a technical pipeline failure; it is simply not promoted.
+
+## FastAPI serving
+
+Export the current MLflow champion:
+
+```bash
+python scripts/export_model.py
+```
+
+Build and run the inference image:
+
+```bash
 docker build -f deploy/Dockerfile -t prediccion-fuga:v1 .
 docker run --rm -p 8000:8000 prediccion-fuga:v1
 ```
 
-El contenedor expone:
+Health check:
 
 ```bash
 curl http://localhost:8000/health
+```
+
+Prediction example:
+
+```bash
 curl -X POST http://localhost:8000/predecir \
   -H 'Content-Type: application/json' \
   -d '{"antiguedad_anios":3,"salario_k":45,"horas_extra_mes":35,"satisfaccion":0.2}'
 ```
 
-El manifiesto de Kubernetes está en `deploy/k8s/deployment.yaml`. `imagePullPolicy: Never` está pensado para un clúster local con la imagen cargada manualmente; para un entorno real habría que usar un registry y una política de actualización de imágenes.
+## Kubernetes
 
-## Reproducibilidad y límites
+The Kubernetes manifests live in `deploy/k8s/deployment.yaml` and include two inference replicas, health probes and CPU/memory requests and limits.
 
-- `dvc.yaml` es la fuente ejecutable del pipeline y `dvc.lock` fija hashes y parámetros.
-- `params.yaml` es el único punto de edición de los parámetros del experimento.
-- El remote DVC no está fijado en el repositorio porque una ruta local sería específica de una máquina y no es almacenamiento compartido.
-- No se versionan modelos binarios, bases de datos de MLflow, artefactos Docker ni datos generados.
-- En un proyecto real se añadirían validación de calidad de datos, autenticación del API, observabilidad y un registro de modelos remoto.
+`imagePullPolicy: Never` is intentionally configured for a local Kubernetes environment where the image is loaded manually. A real deployment would use an image registry and an appropriate image update strategy.
+
+## Drift experiments
+
+The project also contains simple experiments around data and prediction drift under `src/prediccion_fuga/`. These are intended to explore how a model can degrade as the input distribution changes over time.
+
+## Current limitations and possible next steps
+
+This is a learning lab rather than a production platform. Some intentionally simplified areas are:
+
+- MLflow and Airflow currently run locally.
+- Training and orchestration use local filesystem artifacts.
+- The promotion thresholds are static learning rules rather than business-driven policies.
+- The evaluation dataset is stored directly in the repository for reproducibility of the demonstration.
+- Model serving does not yet include authentication, production observability or autoscaling.
+- Airflow currently executes Python commands locally rather than dispatching training workloads as Kubernetes Jobs.
+
+Potential next steps include remote artifact storage, Kubernetes-based training jobs, model-serving observability, stronger data validation, configurable promotion policies and richer drift-triggered retraining workflows.
+
+## Purpose
+
+This repository is primarily a hands-on learning environment for understanding the complete ML model lifecycle from a Platform Engineering perspective. The focus is on being able to explain why each component exists and how the pieces interact, rather than simply combining tools in a demo stack.
