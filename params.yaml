@@ -6,3 +6,6 @@ entrenar:
   n_estimators: 50
   test_size: 0.2
   random_state: 42
+
+evaluacion:
+  min_accuracy: 0.75
