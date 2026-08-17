@@ -16,7 +16,10 @@ def main() -> None:
     tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
     mlflow.set_tracking_uri(tracking_uri)
     run = latest_run()
-    model_uri = f"runs:/{run.info.run_id}/model"
+    model_uri = run.data.tags.get("candidate_model_uri")
+    if not model_uri:
+        raise RuntimeError(f"Run {run.info.run_id} does not contain a candidate_model_uri tag")
+
     registered = mlflow.register_model(model_uri=model_uri, name=MODEL_NAME)
     MlflowClient().set_registered_model_alias(
         name=MODEL_NAME,
