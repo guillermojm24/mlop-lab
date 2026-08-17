@@ -7,6 +7,7 @@ import os
 import mlflow
 import mlflow.sklearn
 import pandas as pd
+from mlflow.models import infer_signature
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import cross_val_score, train_test_split
@@ -35,17 +36,24 @@ def train_with_mlflow() -> str:
     with mlflow.start_run() as run:
         model = RandomForestClassifier(n_estimators=n_estimators, random_state=params["random_state"])
         model.fit(X_train, y_train)
+        predictions = model.predict(X_test)
         scores = cross_val_score(model, X_train, y_train, cv=5)
 
         mlflow.log_params({**params, "n_estimators": n_estimators})
         mlflow.log_metrics(
             {
-                "accuracy": float(accuracy_score(y_test, model.predict(X_test))),
+                "accuracy": float(accuracy_score(y_test, predictions)),
                 "cv_mean": float(scores.mean()),
                 "cv_std": float(scores.std()),
             }
         )
-        mlflow.sklearn.log_model(model, name="model")
+        model_info = mlflow.sklearn.log_model(
+            model,
+            name="model",
+            signature=infer_signature(X_test, predictions),
+            input_example=X_test.head(5),
+        )
+        mlflow.set_tag("candidate_model_uri", model_info.model_uri)
         return run.info.run_id
 
 
