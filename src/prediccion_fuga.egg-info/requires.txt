@@ -1,0 +1,14 @@
+joblib<2,>=1.5
+numpy<3,>=2.0
+pandas<3,>=2.2
+PyYAML<7,>=6
+scikit-learn<2,>=1.5
+
+[api]
+fastapi<1,>=0.110
+mlflow<4,>=2.0
+uvicorn<1,>=0.30
+
+[dev]
+pytest<9,>=8
+ruff<1,>=0.8
