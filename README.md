@@ -1,89 +1,186 @@
-# Predicción de fuga de empleados
+# MLOps Lab: Employee Attrition
 
-Proyecto de MLOps reproducible para estimar el riesgo de fuga de empleados a partir de un dataset sintético. El repositorio muestra el ciclo completo: generación de datos, entrenamiento versionado con DVC, tracking con MLflow, demostraciones de drift, API FastAPI y despliegue en Docker/Kubernetes.
+[![CI](https://github.com/guillermojm24/mlop-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/guillermojm24/mlop-lab/actions/workflows/ci.yml)
 
-> El dataset es sintético y sirve para demostrar prácticas de ingeniería y operación de modelos. No representa decisiones reales de recursos humanos.
+A compact end-to-end MLOps project built to learn how reproducibility, orchestration, experiment tracking, model promotion, serving and observability fit together in a production-style workflow.
 
-## Arquitectura
+The ML problem is intentionally simple: a synthetic employee-attrition classifier. The focus of the repository is **ML platform engineering**, not model sophistication.
+
+> The dataset is synthetic and exists only to demonstrate engineering and operational practices. It must not be used for real HR decisions.
+
+## What this project demonstrates
+
+- Reproducible data and training pipelines with **DVC**.
+- Experiment tracking and model lifecycle management with **MLflow**.
+- Workflow orchestration with **Apache Airflow**.
+- An explicit model quality gate before promotion to the `champion` alias.
+- Model serving through **FastAPI** and Docker.
+- Kubernetes deployment with replicas, probes and resource requests/limits.
+- Prometheus-compatible inference metrics for request volume and latency.
+- CI validation with GitHub Actions.
+- Basic data/concept-drift experiments to explore production model degradation.
+
+## Architecture
 
 ```text
-                  params.yaml
-                       │
-                       ▼
-              ┌────── DVC ──────┐
-              │                 │
-              ▼                 ▼
-     data/empleados.csv   models/modelo.pkl
-                                  │
-                                  ├── predict / drift / monitor
-                                  │
-                                  ▼
-                         MLflow → champion
-                                  │
-                                  ▼
-                  models/modelo_servido/ → API
-                                  │
-                         Docker / Kubernetes
+                        Git / GitHub Actions
+                               |
+                               v
+                       Source + configuration
+                               |
+              +----------------+----------------+
+              |                                 |
+              v                                 v
+        DVC reproducibility              Airflow orchestration
+   data -> train -> metrics       prepare -> train -> evaluate -> register
+              |                                 |
+              +----------------+----------------+
+                               v
+                             MLflow
+                    experiments + model registry
+                               |
+                         quality gate
+                               |
+                         @champion alias
+                               |
+                               v
+                         FastAPI service
+                               |
+                    Docker / Kubernetes
+                               |
+                  health + Prometheus metrics
 ```
 
-La lógica reutilizable vive en `src/prediccion_fuga`. Los comandos operativos están en `scripts/`, el manifiesto de imagen en `deploy/` y los tests en `tests/`. Los datos, modelos exportados y stores locales quedan fuera del repositorio.
+## Repository structure
 
-## Inicio rápido
+```text
+.github/workflows/   CI pipeline
+airflow/dags/        Airflow orchestration DAG
+deploy/              Docker and Kubernetes manifests
+scripts/             Operational MLflow workflow commands
+src/prediccion_fuga/ Reusable Python application/ML code
+tests/               Automated tests
+dvc.yaml             Reproducible DVC pipeline
+params.yaml           Training and promotion parameters
+```
 
-Requisitos: Python 3.11+ y DVC. En este entorno se puede usar el virtualenv incluido:
+## Local reproducible pipeline
+
+Requirements: Python 3.11+ and DVC.
 
 ```bash
-.venv/bin/pip install -r requirements.txt
-.venv/bin/dvc repro
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+dvc repro
+dvc metrics show
 ```
 
-El pipeline deja sus resultados en `data/empleados.csv`, `models/modelo.pkl` y `metrics/metrics.json`.
+The DVC pipeline generates the synthetic dataset, trains the baseline model and stores reproducible metrics while `dvc.lock` pins inputs, parameters and outputs.
 
-Checks principales:
+## MLflow workflow
+
+Start or point the project at an MLflow tracking server and run:
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
-PYTHONPATH=src .venv/bin/python -m prediccion_fuga.predict
-PYTHONPATH=src .venv/bin/python -m prediccion_fuga.drift
-PYTHONPATH=src .venv/bin/python -m prediccion_fuga.drift_ciego
-PYTHONPATH=src .venv/bin/python -m prediccion_fuga.monitor
+export MLFLOW_TRACKING_URI=http://127.0.0.1:5000
+export MLFLOW_EXPERIMENT_NAME=employee-attrition
+
+PYTHONPATH=src python scripts/train_mlflow.py
+PYTHONPATH=src python scripts/evaluate_latest_run.py
+PYTHONPATH=src python scripts/register_latest_run.py
 ```
 
-## MLflow
+The evaluation step reads `evaluacion.min_accuracy` from `params.yaml`. A model that does not meet the threshold fails the workflow and is not promoted. An approved model is registered in MLflow and assigned the `champion` alias.
 
-Con un servidor MLflow local en `http://127.0.0.1:5000`:
+This separates **training** from **promotion**, so automation does not blindly move every new model into the serving path.
+
+## Airflow orchestration
+
+`airflow/dags/ml_pipeline.py` turns the ML workflow into independently observable and retryable tasks:
+
+```text
+prepare_data -> train -> evaluate -> register
+```
+
+Airflow is used as the operational orchestration layer: dependencies, retries, scheduling and task-level visibility. DVC remains responsible for reproducibility and dependency-aware data/model pipelines.
+
+The DAG expects the repository to be available at `/opt/airflow/mlop-lab` by default. Override this with `MLOP_LAB_ROOT`. The MLflow endpoint can be configured with `MLFLOW_TRACKING_URI`.
+
+## Model serving
+
+Export the MLflow champion model before building the inference image:
 
 ```bash
-PYTHONPATH=src .venv/bin/python scripts/train_mlflow.py
+PYTHONPATH=src python scripts/export_model.py
+
+docker build -f deploy/Dockerfile -t employee-attrition-api:v1 .
+docker run --rm -p 8000:8000 employee-attrition-api:v1
 ```
 
-La URL, el experimento y el número de árboles se pueden cambiar sin editar código mediante `MLFLOW_TRACKING_URI`, `MLFLOW_EXPERIMENT_NAME` y `N_ESTIMATORS`.
-
-## API y despliegue
-
-Para servir el modelo champion registrado en MLflow, exportarlo primero:
-
-```bash
-PYTHONPATH=src .venv/bin/python scripts/export_model.py
-docker build -f deploy/Dockerfile -t prediccion-fuga:v1 .
-docker run --rm -p 8000:8000 prediccion-fuga:v1
-```
-
-El contenedor expone:
+Endpoints:
 
 ```bash
 curl http://localhost:8000/health
-curl -X POST http://localhost:8000/predecir \
+curl http://localhost:8000/metrics
+
+curl -X POST http://localhost:8000/predict \
   -H 'Content-Type: application/json' \
   -d '{"antiguedad_anios":3,"salario_k":45,"horas_extra_mes":35,"satisfaccion":0.2}'
 ```
 
-El manifiesto de Kubernetes está en `deploy/k8s/deployment.yaml`. `imagePullPolicy: Never` está pensado para un clúster local con la imagen cargada manualmente; para un entorno real habría que usar un registry y una política de actualización de imágenes.
+The API exports Prometheus metrics including:
 
-## Reproducibilidad y límites
+- `mlop_lab_predictions_total`
+- `mlop_lab_prediction_latency_seconds`
 
-- `dvc.yaml` es la fuente ejecutable del pipeline y `dvc.lock` fija hashes y parámetros.
-- `params.yaml` es el único punto de edición de los parámetros del experimento.
-- El remote DVC no está fijado en el repositorio porque una ruta local sería específica de una máquina y no es almacenamiento compartido.
-- No se versionan modelos binarios, bases de datos de MLflow, artefactos Docker ni datos generados.
-- En un proyecto real se añadirían validación de calidad de datos, autenticación del API, observabilidad y un registro de modelos remoto.
+## Kubernetes
+
+The manifest in `deploy/k8s/deployment.yaml` includes:
+
+- two inference replicas;
+- readiness and liveness probes;
+- CPU/memory requests and limits;
+- a ClusterIP service;
+- Prometheus scrape annotations.
+
+`imagePullPolicy: Never` is deliberately configured for a local Kubernetes lab where the image is loaded directly into the cluster. A production deployment would use an image registry, immutable image tags/digests and an appropriate pull policy.
+
+## Drift experiments
+
+The repository includes small experiments for exploring how a model behaves as production data changes:
+
+```bash
+PYTHONPATH=src python -m prediccion_fuga.drift
+PYTHONPATH=src python -m prediccion_fuga.drift_ciego
+PYTHONPATH=src python -m prediccion_fuga.monitor
+```
+
+These are educational demonstrations rather than a full production drift-monitoring system.
+
+## Design choices
+
+**Why DVC and Airflow?** They solve different problems. DVC provides reproducibility, data/model dependency tracking and cache-aware pipeline execution. Airflow provides operational orchestration: scheduling, task dependencies, retries and visibility.
+
+**Why MLflow?** It provides a shared lifecycle for experiments, metrics, model artifacts and registry promotion instead of treating a serialized model file as the final product.
+
+**Why a quality gate?** Training completing successfully does not mean a model is suitable for production. Promotion is conditional on explicit evaluation criteria.
+
+**Why Kubernetes?** The goal is to treat inference as an operable service with health checks, resource controls, horizontal replicas and observable runtime behaviour.
+
+## Production evolution
+
+This repository is intentionally small enough to run as a learning lab. The next production-oriented steps would be:
+
+- remote object storage for DVC and MLflow artifacts;
+- managed secrets and workload identity;
+- a real image registry and GitOps-based deployment promotion;
+- stronger data-quality validation and model-performance monitoring;
+- Prometheus/Grafana dashboards and alerting;
+- integration tests for the full training-to-serving path;
+- GPU-backed model serving as a separate inference workload.
+
+## CI
+
+GitHub Actions runs tests, Python compilation, DVC reproduction and DVC status checks on pushes and pull requests.
