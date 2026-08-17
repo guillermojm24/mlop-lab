@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: prediccion-fuga
+Version: 1.0.0
+Summary: Pipeline reproducible de MLOps para predecir fuga de empleados
+Requires-Python: >=3.11
+Requires-Dist: joblib<2,>=1.5
+Requires-Dist: numpy<3,>=2.0
+Requires-Dist: pandas<3,>=2.2
+Requires-Dist: PyYAML<7,>=6
+Requires-Dist: scikit-learn<2,>=1.5
+Provides-Extra: api
+Requires-Dist: fastapi<1,>=0.110; extra == "api"
+Requires-Dist: mlflow<4,>=2.0; extra == "api"
+Requires-Dist: uvicorn<1,>=0.30; extra == "api"
+Provides-Extra: dev
+Requires-Dist: pytest<9,>=8; extra == "dev"
+Requires-Dist: ruff<1,>=0.8; extra == "dev"
